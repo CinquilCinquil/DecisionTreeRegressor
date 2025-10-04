@@ -8,13 +8,20 @@ type DatapointSplitter = (AttrType, AttrGet, DatapointSplitterFn);
 type AttrDict = HashMap<i32, AttrGet>;
 
 static N_WAY_SPLIT : usize = 2;
-static MIN_LEAF_SIZE : usize = 2;
+static MIN_LEAF_SIZE : usize = 1;
+
+static mut N_CALLS : usize = 0;
+static mut N_LEAFS : usize = 0;
 
 struct Datapoint {
     red : i32,
     green : i32,
     blue : i32,
     index : i32,
+}
+
+fn take_set_from_child(child : DecisionTree) -> Vec<Datapoint> {
+    child.set
 }
 
 fn rgb_datapoint(red : i32, green : i32, blue : i32, index : i32) -> Datapoint {
@@ -196,25 +203,43 @@ fn split_by_attribute(tree : &mut DecisionTree, splitter : DatapointSplitter) {
     let (pivot, attribute, splitter_fn) = splitter;
     tree.splitter = splitter;
 
+    let mut children : Vec<DecisionTree> = vec![];
     for _ in 0..N_WAY_SPLIT {
-        tree.children.push(new_empty_tree());
+        children.push(new_empty_tree());
     }
 
     let set_len = tree.set.len();
     for _ in 0..set_len {
         let datapoint = tree.set.remove(0);
         let way = splitter_fn(&datapoint, pivot, attribute);
-        tree.children[way].set.push(datapoint);
+        children[way].set.push(datapoint);
+    }
+
+    let mut n_non_empty_children = 0;
+    let mut non_empty_child_index = 0;
+    for i in 0..N_WAY_SPLIT {
+        if children[i].set.len() > 0 {
+            non_empty_child_index = i;
+            n_non_empty_children += 1;
+        }
+    }
+
+    if n_non_empty_children == 1 {
+        tree.set = take_set_from_child(children.remove(non_empty_child_index));
+    }
+    else {
+        tree.children = children;
     }
 }
 
 fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : AttrGet) {
 
+    unsafe {N_CALLS += 1;}
+
     if tree.set.len() <= MIN_LEAF_SIZE {
+        unsafe {N_LEAFS += 1;}
         return;
     }
-
-    //println!("{}", tree.set.len());
 
     let splitter = get_best_splitter(&tree.set, attributes, desired_class);
     split_by_attribute(tree, splitter);
@@ -224,9 +249,9 @@ fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : AttrG
 }
 
 fn image_to_pixels(filepath : &str) -> Vec<Datapoint> {
-    let img = image::open("ex2.png").unwrap();
+    let img = image::open(filepath).unwrap();
     let pixels = img.pixels();
-    let (w, h) = img.dimensions();
+    let (w, _) = img.dimensions();
 
     let mut vec : Vec<Datapoint> = vec![];
     
@@ -252,7 +277,7 @@ fn main() {
     
     let desired_class : AttrGet = |datapoint|{datapoint.index};
 
-    let dataset = image_to_pixels("ex.jpg");
+    let dataset = image_to_pixels("small6.png");
 
     let mut tree : DecisionTree = DecisionTree{
         set : dataset,
@@ -262,5 +287,7 @@ fn main() {
 
     split(&mut tree, &attributes, desired_class);
 
+    println!("CALLS: {}", unsafe {N_CALLS});
+    println!("LEAFS: {}", unsafe {N_LEAFS});
     println!("depth: {}", print_tree_stats(&tree, 0));
 }

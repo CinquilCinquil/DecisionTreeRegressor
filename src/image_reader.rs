@@ -1,6 +1,14 @@
 use image::GenericImageView;
 
-fn main() {
+pub fn l(filepath : &str) -> image::DynamicImage {
+    return image::open(filepath).unwrap();
+} // (u32, u32, image::Rgba<u8>)
+
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>());
+}
+
+pub fn test() {
     let img = image::open("ex2.png").unwrap();    
     println!("dimensions {:?}", img.dimensions());
     println!("{:?}", img.color());
@@ -12,6 +20,7 @@ fn main() {
 
     let mut i = 0;
     for pixel in pixels {
+        print_type_of(&pixel);
         let color = pixel.2.0;
         let pos = (pixel.0, pixel.1);
         println!("{:?} {:?}", pos, color);
@@ -33,4 +42,8 @@ fn main() {
     */
 
     //img.save("test.png").unwrap();
+}
+
+fn main() {
+
 }

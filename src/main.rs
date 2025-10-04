@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use image::GenericImageView;
 
 type AttrType = i32; // FIX: I'm assuming all attribute types are the same, this isn't ideal
 type AttrGet = fn(&Datapoint) -> AttrType;
@@ -51,6 +52,17 @@ fn print_tree(tree : &DecisionTree, tab : i32) {
     }
 }
 
+fn print_tree_stats(tree : &DecisionTree, depth : i32) -> i32 {
+
+    let mut max_depth = depth;
+
+    for child in &tree.children {
+        max_depth = std::cmp::max(print_tree_stats(child, depth + 1), max_depth);
+    }
+
+    return max_depth;
+}
+
 fn _get_stub_splitter() -> DatapointSplitter {
     (0, |_|{0}, |_, _, _| {0})
 }
@@ -86,7 +98,8 @@ fn get_inpurity_reduction(
 
     let (_, _, splitter_fn) = get_binary_splitter(attribute, candidate);
 
-    let mut child_sets : [Vec<AttrType>; N_WAY_SPLIT] = Default::default();
+    let mut child_sets : Vec<Vec<AttrType>> = vec![];
+    for _ in 0..N_WAY_SPLIT {child_sets.push(vec![]);}
     let mut set_ : Vec<AttrType> = vec![];
 
     for datapoint in set {
@@ -201,13 +214,33 @@ fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : AttrG
         return;
     }
 
-    println!("{}", tree.set.len());
+    //println!("{}", tree.set.len());
 
     let splitter = get_best_splitter(&tree.set, attributes, desired_class);
     split_by_attribute(tree, splitter);
     for mut child in &mut tree.children {
         split(&mut child, attributes, desired_class);
     }
+}
+
+fn image_to_pixels(filepath : &str) -> Vec<Datapoint> {
+    let img = image::open("ex2.png").unwrap();
+    let pixels = img.pixels();
+    let (w, h) = img.dimensions();
+
+    let mut vec : Vec<Datapoint> = vec![];
+    
+    for pixel in pixels {
+        let color = pixel.2.0;
+        let pos = (pixel.0, pixel.1);
+        vec.push(rgb_datapoint(
+            color[0] as i32, color[1] as i32, color[2] as i32,
+            (pos.0 + w * pos.1) as i32));
+    }
+
+    println!("collected all pixels");
+
+    return vec;
 }
 
 fn main() {
@@ -219,13 +252,7 @@ fn main() {
     
     let desired_class : AttrGet = |datapoint|{datapoint.index};
 
-    let dataset = vec![
-        rgb_datapoint(255, 120, 80, 0),
-        rgb_datapoint(54, 12, 100, 1),
-        rgb_datapoint(0, 0, 0, 2),
-        rgb_datapoint(255, 255, 255, 3),
-        rgb_datapoint(1, 2, 3, 4)
-    ];
+    let dataset = image_to_pixels("ex.jpg");
 
     let mut tree : DecisionTree = DecisionTree{
         set : dataset,
@@ -235,5 +262,5 @@ fn main() {
 
     split(&mut tree, &attributes, desired_class);
 
-    print_tree(&tree, 0);
+    println!("depth: {}", print_tree_stats(&tree, 0));
 }

@@ -117,7 +117,7 @@ fn get_inpurity_reduction(
         set_.push(desired_class_datapoint);
     }
 
-    let mut ds = gini_index(&set_);
+    let mut ds = 0.0;//gini_index(&set_);
     let set_len = set_.len() as f64;
 
     for way in 0..N_WAY_SPLIT {
@@ -166,11 +166,11 @@ fn get_best_attribute_splitter(
     }
 
     let mut best_candidate = candidates[0];
-    let mut best_inpurity_reduction = 0.0;
+    let mut best_inpurity_reduction = 1.0;
 
     for candidate in candidates {
         let inpurity_reduction = get_inpurity_reduction(set, attribute, candidate, desired_class);
-        if inpurity_reduction >= best_inpurity_reduction {
+        if inpurity_reduction >= best_inpurity_reduction || best_inpurity_reduction == 1.0 {
             best_inpurity_reduction = inpurity_reduction;
             best_candidate = candidate;
         }
@@ -182,14 +182,14 @@ fn get_best_attribute_splitter(
 fn get_best_splitter(
     set : &Vec<Datapoint>, attributes : &AttrDict, desired_class : AttrGet) -> DatapointSplitter {
     
-    let mut best_inpurity_reduction = 0.0;
+    let mut best_inpurity_reduction = 1.0;
     let mut best_splitter : DatapointSplitter = _get_stub_splitter();
 
     for attribute in attributes.values() {
 
         let (inpurity_reduction, splitter) = get_best_attribute_splitter(set, *attribute, desired_class);
 
-        if inpurity_reduction >= best_inpurity_reduction {
+        if inpurity_reduction >= best_inpurity_reduction || best_inpurity_reduction == 1.0 {
             best_inpurity_reduction = inpurity_reduction;
             best_splitter = splitter;
         }

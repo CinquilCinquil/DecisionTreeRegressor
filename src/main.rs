@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 
 mod types;
-mod image_reader;
+mod image_manipulation;
 mod decision_tree;
 
 use types::{DecisionTree, DesiredClassGet, AttrDict};
@@ -43,7 +43,7 @@ fn main() {
     
     let desired_class : DesiredClassGet = |datapoint|{(datapoint.red, datapoint.green, datapoint.blue)};
 
-    let dataset = image_reader::image_to_pixels(args[1].as_str());
+    let (dataset, w, h) = image_manipulation::image_to_pixels(args[1].as_str());
     let data_bytes = dataset.len() * 3;
 
     let mut tree : DecisionTree = DecisionTree{
@@ -55,4 +55,12 @@ fn main() {
     decision_tree::split(&mut tree, &attributes, desired_class);
 
     print_stats(&tree, data_bytes);
+
+    image_manipulation::generate_image_by_prediction(&tree, desired_class, (w, h));
+
+    /*
+    let test_value = types::rgb_datapoint(0,0,0, 0, 0);
+    println!("Prediction for {:?}: {:?}", 
+        test_value,decision_tree::predict(&tree, &test_value, desired_class));
+    */
 }

@@ -8,6 +8,7 @@ pub type DatapointSplitterFn = fn(&Datapoint, AttrType, AttrGet) -> usize;
 pub type DatapointSplitter = (AttrType, AttrGet, DatapointSplitterFn);
 pub type AttrDict = HashMap<i32, AttrGet>;
 
+#[derive(Debug)]
 pub struct Datapoint {
     pub red : i32,
     pub green : i32,
@@ -64,4 +65,8 @@ pub fn print_tree_stats(tree : &DecisionTree, depth : i32) -> i32 {
     }
 
     return max_depth;
+}
+
+pub fn get_type_name<T>(_: &T) -> &str {
+    return std::any::type_name::<T>()
 }

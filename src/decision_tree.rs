@@ -5,6 +5,7 @@ use types::{Datapoint, DecisionTree, AttrType,
 DesiredClassType, AttrGet, DesiredClassGet,
 DatapointSplitterFn, DatapointSplitter, AttrDict };
 
+pub static REGRESSION_TREE : bool = true;
 pub static N_WAY_SPLIT : usize = 2;
 pub static MIN_LEAF_SIZE : usize = 3;
 
@@ -48,9 +49,9 @@ pub fn get_inpurity_reduction(
 
     for datapoint in set {
         let way = splitter_fn(datapoint, candidate, attribute);
-        let desired_class_datapoint = desired_class(datapoint);
+        let desired_class_value = desired_class(datapoint);
 
-        child_sets[way].push(desired_class_datapoint);
+        child_sets[way].push(desired_class_value);
     }
 
     let mut ds = 0.0;//gini_index(&set_);
@@ -200,4 +201,54 @@ pub fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : D
     for mut child in &mut tree.children {
         split(&mut child, attributes, desired_class);
     }
+}
+
+fn get_mean(set : &Vec<Datapoint>, desired_class : DesiredClassGet) -> DesiredClassType {
+    /*
+        The usage of 'match' here is not the best solution but it will do...
+    */
+
+    let set_len = set.len() as i32;
+    let mut mean : DesiredClassType = Default::default();
+
+    for element in set {
+        let desired_class_value = desired_class(element);
+
+        match types::get_type_name(&desired_class_value) {
+            "(i32, i32, i32)" => {
+                mean = (mean.0 + desired_class_value.0/set_len,
+                        mean.1 + desired_class_value.1/set_len,
+                        mean.2 + desired_class_value.2/set_len);
+            },
+
+            &_ => {
+                panic!("DesiredClassType not matched!");
+            }
+            /*
+            "i32" => {
+                mean += desired_class_value/set_len;
+            }
+            */
+        }
+    }
+
+    return mean;
+}
+
+fn get_mode(set : &Vec<Datapoint>, desired_class : DesiredClassGet) -> DesiredClassType {
+    todo!();
+}
+
+pub fn predict(tree : &DecisionTree, input : &Datapoint, desired_class : DesiredClassGet) -> DesiredClassType {
+
+    if tree.children.len() == 0 {
+        if tree.set.len() == 0 {panic!("Tried to determine class of an empty set!");}
+
+        return if REGRESSION_TREE {get_mean(&tree.set, desired_class)}
+        else {get_mode(&tree.set, desired_class)}
+    }
+
+    let (pivot, attribute, splitter_fn) = tree.splitter;
+
+    return predict(&tree.children[splitter_fn(input, pivot, attribute)], input, desired_class);
 }

@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use image::GenericImageView;
 
 type AttrType = i32; // FIX: I'm assuming all attribute types are the same, this isn't ideal
+type DesiredClassType = (i32, i32, i32);
 type AttrGet = fn(&Datapoint) -> AttrType;
+type DesiredClassGet = fn(&Datapoint) -> DesiredClassType;
 type DatapointSplitterFn = fn(&Datapoint, AttrType, AttrGet) -> usize;
 type DatapointSplitter = (AttrType, AttrGet, DatapointSplitterFn);
 type AttrDict = HashMap<i32, AttrGet>;
@@ -12,20 +14,22 @@ static MIN_LEAF_SIZE : usize = 1;
 
 static mut N_CALLS : usize = 0;
 static mut N_LEAFS : usize = 0;
+static mut N_INPURE_LEAFS : usize = 0;
 
 struct Datapoint {
     red : i32,
     green : i32,
     blue : i32,
-    index : i32,
+    x : i32,
+    y : i32,
 }
 
 fn take_set_from_child(child : DecisionTree) -> Vec<Datapoint> {
     child.set
 }
 
-fn rgb_datapoint(red : i32, green : i32, blue : i32, index : i32) -> Datapoint {
-    Datapoint{red : red, green : green, blue : blue, index : index}
+fn rgb_datapoint(red : i32, green : i32, blue : i32, x : i32, y : i32) -> Datapoint {
+    Datapoint{red : red, green : green, blue : blue, x : x, y : y}
 }
 
 struct DecisionTree {
@@ -47,9 +51,9 @@ fn print_tree(tree : &DecisionTree, tab : i32) {
 
     print!("{tab_str}Node:");
     for datapoint in &tree.set {
-        print!(" {:?}", datapoint.index);
+        print!(" {:?} {:?}", datapoint.x, datapoint.y);
     }
-    let ex_datapoint = Datapoint{red : 0, green : 1, blue : 2, index : -1};
+    let ex_datapoint = Datapoint{red : 0, green : 1, blue : 2, x : -1, y : -1};
     print!("| x <= {} taking into account channel{} ", tree.splitter.0, tree.splitter.1(&ex_datapoint));
 
     println!("");
@@ -81,9 +85,9 @@ fn get_binary_splitter(attribute : AttrGet, pivot : AttrType) -> DatapointSplitt
     return (pivot, attribute, splitter_fn);
 }
 
-fn gini_index(desired_classes_set : &Vec<AttrType>) -> f64 {
+fn gini_index(desired_classes_set : &Vec<DesiredClassType>) -> f64 {
 
-    let mut desired_class_elements : HashMap<AttrType, i32> = HashMap::new();
+    let mut desired_class_elements : HashMap<DesiredClassType, i32> = HashMap::new();
     for desired_class_element in desired_classes_set {
         let entry = desired_class_elements.entry(*desired_class_element).or_insert(0);
         *entry += 1;
@@ -101,24 +105,22 @@ fn gini_index(desired_classes_set : &Vec<AttrType>) -> f64 {
 }
 
 fn get_inpurity_reduction(
-    set : &Vec<Datapoint>, attribute : AttrGet, candidate : AttrType, desired_class : AttrGet) -> f64 {
+    set : &Vec<Datapoint>, attribute : AttrGet, candidate : AttrType, desired_class : DesiredClassGet) -> f64 {
 
     let (_, _, splitter_fn) = get_binary_splitter(attribute, candidate);
 
-    let mut child_sets : Vec<Vec<AttrType>> = vec![];
+    let mut child_sets : Vec<Vec<DesiredClassType>> = vec![];
     for _ in 0..N_WAY_SPLIT {child_sets.push(vec![]);}
-    let mut set_ : Vec<AttrType> = vec![];
 
     for datapoint in set {
         let way = splitter_fn(datapoint, candidate, attribute);
         let desired_class_datapoint = desired_class(datapoint);
 
         child_sets[way].push(desired_class_datapoint);
-        set_.push(desired_class_datapoint);
     }
 
     let mut ds = 0.0;//gini_index(&set_);
-    let set_len = set_.len() as f64;
+    let set_len = set.len() as f64;
 
     for way in 0..N_WAY_SPLIT {
         let ratio : f64 = child_sets[way].len() as f64 / set_len as f64;
@@ -128,7 +130,24 @@ fn get_inpurity_reduction(
     return ds;
 }
 
-fn get_i32_candidates(set : &Vec<Datapoint>, attribute : AttrGet) -> Vec<AttrType> {
+// First Middle Last (FML)
+fn get_i32_candidates_FML(set : &Vec<Datapoint>, attribute : AttrGet) -> Vec<AttrType> {
+
+    if set.is_empty() {
+        panic!("Empty set when looking for candidates!");
+    }
+
+    let a = 0;
+    let c = set.len() - 1;
+    let b = (a + c)/2;
+
+    let candidates = vec![attribute(&set[a]), attribute(&set[b]), attribute(&set[c])];
+
+    return candidates;
+}
+
+// Minimum Mean Maximum (MMM)
+fn get_i32_candidates_MMM(set : &Vec<Datapoint>, attribute : AttrGet) -> Vec<AttrType> {
 
     if set.is_empty() {
         panic!("Empty set when looking for candidates!");
@@ -157,9 +176,9 @@ fn get_i32_candidates(set : &Vec<Datapoint>, attribute : AttrGet) -> Vec<AttrTyp
 }
 
 fn get_best_attribute_splitter(
-    set : &Vec<Datapoint>, attribute : AttrGet, desired_class : AttrGet) -> (f64, DatapointSplitter) {
+    set : &Vec<Datapoint>, attribute : AttrGet, desired_class : DesiredClassGet) -> (f64, DatapointSplitter) {
     
-    let candidates = get_i32_candidates(set, attribute);
+    let candidates = get_i32_candidates_FML(set, attribute);
 
     if candidates.is_empty() {
         panic!("No suitable candidate found!");
@@ -180,7 +199,7 @@ fn get_best_attribute_splitter(
 }
 
 fn get_best_splitter(
-    set : &Vec<Datapoint>, attributes : &AttrDict, desired_class : AttrGet) -> DatapointSplitter {
+    set : &Vec<Datapoint>, attributes : &AttrDict, desired_class : DesiredClassGet) -> DatapointSplitter {
     
     let mut best_inpurity_reduction = 1.0;
     let mut best_splitter : DatapointSplitter = _get_stub_splitter();
@@ -226,13 +245,14 @@ fn split_by_attribute(tree : &mut DecisionTree, splitter : DatapointSplitter) {
 
     if n_non_empty_children == 1 {
         tree.set = take_set_from_child(children.remove(non_empty_child_index));
+        unsafe {N_INPURE_LEAFS += 1;}
     }
     else {
         tree.children = children;
     }
 }
 
-fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : AttrGet) {
+fn split(tree : &mut DecisionTree, attributes : &AttrDict, desired_class : DesiredClassGet) {
 
     unsafe {N_CALLS += 1;}
 
@@ -260,7 +280,7 @@ fn image_to_pixels(filepath : &str) -> Vec<Datapoint> {
         let pos = (pixel.0, pixel.1);
         vec.push(rgb_datapoint(
             color[0] as i32, color[1] as i32, color[2] as i32,
-            (pos.0 + w * pos.1) as i32));
+            pos.0 as i32, pos.1 as i32));
     }
 
     println!("collected all pixels");
@@ -271,13 +291,12 @@ fn image_to_pixels(filepath : &str) -> Vec<Datapoint> {
 fn main() {
 
     let mut attributes : AttrDict = HashMap::new();
-    attributes.insert(0, |datapoint|{datapoint.red});
-    attributes.insert(1, |datapoint|{datapoint.green});
-    attributes.insert(2, |datapoint|{datapoint.blue});
+    attributes.insert(0, |datapoint|{datapoint.x});
+    attributes.insert(1, |datapoint|{datapoint.y});
     
-    let desired_class : AttrGet = |datapoint|{datapoint.index};
+    let desired_class : DesiredClassGet = |datapoint|{(datapoint.red, datapoint.green, datapoint.blue)};
 
-    let dataset = image_to_pixels("small6.png");
+    let dataset = image_to_pixels("small4.png");
 
     let mut tree : DecisionTree = DecisionTree{
         set : dataset,
@@ -288,6 +307,8 @@ fn main() {
     split(&mut tree, &attributes, desired_class);
 
     println!("CALLS: {}", unsafe {N_CALLS});
-    println!("LEAFS: {}", unsafe {N_LEAFS});
+    println!("LEAFS: {}", unsafe {N_LEAFS + N_INPURE_LEAFS});
+    println!("INPURE_LEAFS: {}", unsafe {N_INPURE_LEAFS});
     println!("depth: {}", print_tree_stats(&tree, 0));
+    //print_tree(&tree, 0);
 }

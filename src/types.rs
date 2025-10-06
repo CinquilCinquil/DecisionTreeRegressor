@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 pub type AttrType = i32; // FIX: I'm assuming all attribute types are the same, this isn't ideal
-pub type DesiredClassType = (i32, i32, i32);
+pub type DesiredClassType = (i32, i32);
 pub type AttrGet = fn(&Datapoint) -> AttrType;
 pub type DesiredClassGet = fn(&Datapoint) -> DesiredClassType;
 pub type DatapointSplitterFn = fn(&Datapoint, AttrType, AttrGet) -> usize;

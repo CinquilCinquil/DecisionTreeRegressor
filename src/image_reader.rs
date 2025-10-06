@@ -1,49 +1,21 @@
 use image::GenericImageView;
+use crate::types::{Datapoint, rgb_datapoint};
 
-pub fn l(filepath : &str) -> image::DynamicImage {
-    return image::open(filepath).unwrap();
-} // (u32, u32, image::Rgba<u8>)
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>());
-}
-
-pub fn test() {
-    let img = image::open("ex2.png").unwrap();    
-    println!("dimensions {:?}", img.dimensions());
-    println!("{:?}", img.color());
-    println!("{:?}", img.get_pixel(0, 0));
-    println!("{:?}", img.get_pixel(1, 0));
-
-    let (w, h) = img.dimensions();
+pub fn image_to_pixels(filepath : &str) -> Vec<Datapoint> {
+    let img = image::open(filepath).unwrap();
     let pixels = img.pixels();
 
-    let mut i = 0;
+    let mut vec : Vec<Datapoint> = vec![];
+    
     for pixel in pixels {
-        print_type_of(&pixel);
         let color = pixel.2.0;
         let pos = (pixel.0, pixel.1);
-        println!("{:?} {:?}", pos, color);
-        if i > 3 {
-            break;
-        }
-        i += 1;
+        vec.push(rgb_datapoint(
+            color[0] as i32, color[1] as i32, color[2] as i32,
+            pos.0 as i32, pos.1 as i32));
     }
 
-    //sla.next();
-    //println!("{:?}", sla);
+    println!("collected all pixels");
 
-    /*
-    for i in 0..w {
-        for j in 0..h {
-
-        }
-    }
-    */
-
-    //img.save("test.png").unwrap();
-}
-
-fn main() {
-
+    return vec;
 }

@@ -6,7 +6,7 @@ DesiredClassType, AttrGet, DesiredClassGet,
 DatapointSplitterFn, DatapointSplitter, AttrDict };
 
 pub static N_WAY_SPLIT : usize = 2;
-pub static MIN_LEAF_SIZE : usize = 1;
+pub static MIN_LEAF_SIZE : usize = 3;
 
 pub static mut N_CALLS : usize = 0;
 pub static mut N_LEAFS : usize = 0;
